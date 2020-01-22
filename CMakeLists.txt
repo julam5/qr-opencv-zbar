@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.2 FATAL_ERROR)
 
 find_package( OpenCV REQUIRED )
 
-add_executable(qrtest  camtest.cpp qrzbar.cpp)
+add_executable(qrtest  main.cpp qrzbar.cpp)
 
 target_include_directories(qrtest PRIVATE ${PROJECT_SOURCE_DIR}/lib )
 

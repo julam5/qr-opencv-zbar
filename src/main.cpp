@@ -88,6 +88,7 @@ int main(int argc, char** argv )
         Point2f center;
 		bool ok = qrzbar.FindQRCenter(frame,center);
         //cout<<"End of result drawn"<<endl;   
+        std::cout<<"Center: "<<center<<std::endl;   
 		count = 0;
 	}else{
 		count++;

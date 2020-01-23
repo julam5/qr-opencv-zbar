@@ -8,4 +8,4 @@ add_executable(qrtest  ${PROJECT_SOURCE_DIR}/src/main.cpp ${PROJECT_SOURCE_DIR}/
 target_include_directories(qrtest PRIVATE ${PROJECT_SOURCE_DIR}/include )
 
 
-target_link_libraries(qrtest ${OpenCV_LIBS} zbar)
+target_link_libraries(qrtest ${OpenCV_LIBS} zbar AirspaceCommon)

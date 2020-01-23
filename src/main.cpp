@@ -3,6 +3,7 @@
 #include <opencv2/opencv.hpp>
 #include <chrono>
 #include "qrzbar.hpp"
+#include "Airspace/Camera/cBoschCameraCtrlDriver.hpp"
 
 using namespace cv;
 using namespace std;
@@ -55,8 +56,8 @@ int main(int argc, char** argv )
 
     cap.set(cv::CAP_PROP_FPS, 60);
     cap.set(cv::CAP_PROP_FOURCC, CV_FOURCC('Y', 'U', 'Y', 'V'));
-    cap.set(cv::CAP_PROP_FRAME_HEIGHT, 480);
-    cap.set(cv::CAP_PROP_FRAME_WIDTH, 640);
+    cap.set(cv::CAP_PROP_FRAME_HEIGHT, 1080);
+    cap.set(cv::CAP_PROP_FRAME_WIDTH, 1920);
 
     QRZbar qrzbar;
     qrzbar.init();
@@ -65,6 +66,20 @@ int main(int argc, char** argv )
 
     namedWindow("result",1);
     Mat frame;
+
+  Airspace::BoschConfiguration config; 
+  config.camera_control_addr = "10.1.2.101";
+  config.camera_control_pass = "Gr0und!Sp4c3";
+  config.panOffset = 120; 
+  config.tiltOffset = 197; 
+
+  Airspace::BoschLookupEntry e;
+  e.level=1;
+  e.range = 100;
+  config.zoomLookup.insert(std::pair<int,Airspace::BoschLookupEntry>(1,e));
+
+  Airspace::cBoschCameraCtrlDriver Camera(config);
+
 
     // Using time point and system_clock
     std::chrono::time_point<std::chrono::system_clock> start, prev_start;
@@ -88,7 +103,18 @@ int main(int argc, char** argv )
         Point2f center;
 		bool ok = qrzbar.FindQRCenter(frame,center);
         //cout<<"End of result drawn"<<endl;   
-        std::cout<<"Center: "<<center<<std::endl;   
+        if (ok) 
+        {
+            std::cout<<"Center: "<<center<<std::endl; 
+            std::cout<<"Frame cols: "<<frame.cols<<std::endl; 
+            std::cout<<"Frame rows: "<<frame.rows<<std::endl; 
+            std::cout<<"center.x/frame.cols: "<<center.x/frame.cols << "  center.y/frame.rows: " << center.y/frame.rows<<std::endl; 
+            
+            Camera.moveCameraPix(center.x/frame.cols, center.y/frame.rows);
+            sleep(10);
+        }else{
+            std::cout<<"Not Found"<<std::endl;
+        }
 		count = 0;
 	}else{
 		count++;

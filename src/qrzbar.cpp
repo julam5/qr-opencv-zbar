@@ -17,6 +17,7 @@ void QRZbar::init()
 
 bool QRZbar::FindQRCenter(cv::Mat& frame, cv::Point2f& center)
 {
+    bool found = false;
     cv::Mat grey;  
     cv::cvtColor(frame,grey,CV_BGR2GRAY);  
     int width = frame.cols;   
@@ -51,8 +52,9 @@ bool QRZbar::FindQRCenter(cv::Mat& frame, cv::Point2f& center)
         findIntersection(pts, center);
         //std::cout<<"Center: "<<center<<std::endl;   
         circle(frame, center, 3, cv::Scalar(0,255,255), -1);
+        found = true;
     }
-    return true;
+    return found;
 }
 
 

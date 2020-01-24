@@ -2,6 +2,11 @@
 #include <stdlib.h>
 #include <opencv2/opencv.hpp>
 #include <chrono>
+#include <thread>
+#include <mutex>
+#include <memory>
+#include <future>
+
 #include "qrzbar.hpp"
 #include "Airspace/Camera/cBoschCameraCtrlDriver.hpp"
 
@@ -9,6 +14,32 @@ using namespace cv;
 using namespace std;
 
 
+void threadFunction(std::shared_ptr<bool> pok, std::shared_ptr<float> pnormX, std::shared_ptr<float> pnormY, std::future<void> futureObj)
+{
+    Airspace::BoschConfiguration config; 
+    config.camera_control_addr = "10.1.2.101";
+    config.camera_control_pass = "Gr0und!Sp4c3";
+    config.panOffset = 120; 
+    config.tiltOffset = 197; 
+
+    Airspace::BoschLookupEntry e;
+    e.level=1;
+    e.range = 100;
+    config.zoomLookup.insert(std::pair<int,Airspace::BoschLookupEntry>(1,e));
+
+    Airspace::cBoschCameraCtrlDriver Camera(config);
+
+    while (futureObj.wait_for(std::chrono::milliseconds(1)) == std::future_status::timeout)
+    {
+        //std::cout<<"Threading"<<std::endl;
+        if(*pok == true){
+            std::cout<<"Found Center! :"<< *pnormX <<","<< *pnormY<<std::endl;
+            Camera.moveCameraPix(*pnormX, *pnormY);
+        }
+        sleep(5);
+    }
+    std::cout<<"Left thread"<<std::endl;
+}
 
 int main(int argc, char** argv )
 {
@@ -54,10 +85,10 @@ int main(int argc, char** argv )
         return -1;
     }
 
-    cap.set(cv::CAP_PROP_FPS, 60);
-    cap.set(cv::CAP_PROP_FOURCC, CV_FOURCC('Y', 'U', 'Y', 'V'));
-    cap.set(cv::CAP_PROP_FRAME_HEIGHT, 1080);
-    cap.set(cv::CAP_PROP_FRAME_WIDTH, 1920);
+    //cap.set(cv::CAP_PROP_FPS, 60);
+    //cap.set(cv::CAP_PROP_FOURCC, CV_FOURCC('Y', 'U', 'Y', 'V'));
+    //cap.set(cv::CAP_PROP_FRAME_HEIGHT, 1080);
+    //cap.set(cv::CAP_PROP_FRAME_WIDTH, 1920);
 
     QRZbar qrzbar;
     qrzbar.init();
@@ -67,18 +98,52 @@ int main(int argc, char** argv )
     namedWindow("result",1);
     Mat frame;
 
-  Airspace::BoschConfiguration config; 
-  config.camera_control_addr = "10.1.2.101";
-  config.camera_control_pass = "Gr0und!Sp4c3";
-  config.panOffset = 120; 
-  config.tiltOffset = 197; 
+    bool ok = false;
+    std::shared_ptr<bool> pok = std::make_shared<bool>(ok);
 
-  Airspace::BoschLookupEntry e;
-  e.level=1;
-  e.range = 100;
-  config.zoomLookup.insert(std::pair<int,Airspace::BoschLookupEntry>(1,e));
+    float normX = -1.0;
+    std::shared_ptr<float> pnormX = std::make_shared<float>(normX);
+    float normY = -1.0;
+    std::shared_ptr<float> pnormY = std::make_shared<float>(normY);
 
-  Airspace::cBoschCameraCtrlDriver Camera(config);
+
+    // Create a std::promise object
+	std::promise<void> exitSignal;
+ 
+	//Fetch std::future object associated with promise
+	std::future<void> futureObj = exitSignal.get_future();
+
+
+
+    std::thread th(&threadFunction, pok, pnormX, pnormY, std::move(futureObj));
+    //std::shared_ptr<std::thread> streamThread;
+/*
+    streamThread = std::make_shared<std::thread>([pok,pmainLoop, pnormX, pnormY]() {
+
+        Airspace::BoschConfiguration config; 
+        config.camera_control_addr = "10.1.2.101";
+        config.camera_control_pass = "Gr0und!Sp4c3";
+        config.panOffset = 120; 
+        config.tiltOffset = 197; 
+
+        Airspace::BoschLookupEntry e;
+        e.level=1;
+        e.range = 100;
+        config.zoomLookup.insert(std::pair<int,Airspace::BoschLookupEntry>(1,e));
+
+        Airspace::cBoschCameraCtrlDriver Camera(config);
+
+        while (1)
+        {
+            //std::cout<<"Threading"<<std::endl;
+            if(*pok == true){
+                std::cout<<"Found Center! :"<< *pnormX <<","<< *pnormY<<std::endl;
+                Camera.moveCameraPix(*pnormX, *pnormY);
+            }
+            sleep(10);
+        }
+    });
+*/
 
 
     // Using time point and system_clock
@@ -87,33 +152,31 @@ int main(int argc, char** argv )
     start = std::chrono::system_clock::now();
     for(;;)
     {
-        prev_start = start;
-        start = std::chrono::system_clock::now();
-        std::chrono::duration<double> elapsed_seconds = start - prev_start;
-        //std::cout << "FPS: " << 1.0/elapsed_seconds.count() << "s\n";
         cap >> frame; // get a new frame from camera
-        //end = std::chrono::system_clock::now();
 
 
         if(frame.empty())
             break;
 
-	if(count %5 == 0)
+	if(count == 20)
 	{
         Point2f center;
-		bool ok = qrzbar.FindQRCenter(frame,center);
+		*pok = qrzbar.FindQRCenter(frame,center);
         //cout<<"End of result drawn"<<endl;   
-        if (ok) 
+        if (*pok) 
         {
-            std::cout<<"Center: "<<center<<std::endl; 
-            std::cout<<"Frame cols: "<<frame.cols<<std::endl; 
-            std::cout<<"Frame rows: "<<frame.rows<<std::endl; 
-            std::cout<<"center.x/frame.cols: "<<center.x/frame.cols << "  center.y/frame.rows: " << center.y/frame.rows<<std::endl; 
+            //std::cout<<"Center: "<<center<<std::endl; 
+            //std::cout<<"Frame cols: "<<frame.cols<<std::endl; 
+            //std::cout<<"Frame rows: "<<frame.rows<<std::endl; 
+            //std::cout<<"center.x/frame.cols: "<<center.x/frame.cols << "  center.y/frame.rows: " << center.y/frame.rows<<std::endl; 
             
-            Camera.moveCameraPix(center.x/frame.cols, center.y/frame.rows);
-            sleep(10);
+            //Camera.moveCameraPix(center.x/frame.cols, center.y/frame.rows);
+            //sleep(10);
+            //std::cout<<"Found Center Main! :"<< *pnormX <<","<< *pnormY<<std::endl;
+            *pnormX = center.x/frame.cols;
+            *pnormY = center.y/frame.rows;
         }else{
-            std::cout<<"Not Found"<<std::endl;
+            //std::cout<<"Not Found"<<std::endl;
         }
 		count = 0;
 	}else{
@@ -122,12 +185,14 @@ int main(int argc, char** argv )
 
         // show image
         cv::imshow( "result", frame );
-        int fps = cap.get(cv::CAP_PROP_FPS);
-        //printf("%d\n",fps);
 
         if(waitKey(1) >= 0) break;
     }
-
+    //Set the value in promise
+    exitSignal.set_value();
+    //Wait for thread to join
+    th.join();
+    std::cout << "Exiting Main Function" << std::endl;
 
     return 0;
 

@@ -35,6 +35,10 @@ void threadFunction(std::shared_ptr<bool> pok, std::shared_ptr<float> pnormX, st
         if(*pok == true){
             std::cout<<"Found Center! :"<< *pnormX <<","<< *pnormY<<std::endl;
             Camera.moveCameraPix(*pnormX, *pnormY);
+            sleep(3);
+            std::cout<<"Get Pan :"<< Camera.getPan() <<std::endl;
+            sleep(1);
+            std::cout<<"Get Tilt :"<< Camera.getTilt() <<std::endl;
         }
         sleep(5);
     }
@@ -43,12 +47,6 @@ void threadFunction(std::shared_ptr<bool> pok, std::shared_ptr<float> pnormX, st
 
 int main(int argc, char** argv )
 {
-    // Usage:
-    // ./camtest (default index is 1)
-    // ./camtest <camera_index> | <movie_file>
-    // e.g.
-    // ./camtest 0
-    // ./camtest /home/ubuntu/Downloads/DJI_0004.mp4
 
     if (argc == 1){
         cout<< "Usage:\n";
@@ -65,9 +63,6 @@ int main(int argc, char** argv )
     const string input = (argc > 1) ? argv[1] : "1"; // default to 1
     char* p;
     int converted = strtol(input.c_str(), &p, 10);
-    // cout << "input: " << input << endl;
-    // cout << "converted: "<< converted << endl;
-    // cout << "p: " << p << endl;
     VideoCapture cap;
     if (*p){
         cap.open(input);
@@ -116,34 +111,6 @@ int main(int argc, char** argv )
 
 
     std::thread th(&threadFunction, pok, pnormX, pnormY, std::move(futureObj));
-    //std::shared_ptr<std::thread> streamThread;
-/*
-    streamThread = std::make_shared<std::thread>([pok,pmainLoop, pnormX, pnormY]() {
-
-        Airspace::BoschConfiguration config; 
-        config.camera_control_addr = "10.1.2.101";
-        config.camera_control_pass = "Gr0und!Sp4c3";
-        config.panOffset = 120; 
-        config.tiltOffset = 197; 
-
-        Airspace::BoschLookupEntry e;
-        e.level=1;
-        e.range = 100;
-        config.zoomLookup.insert(std::pair<int,Airspace::BoschLookupEntry>(1,e));
-
-        Airspace::cBoschCameraCtrlDriver Camera(config);
-
-        while (1)
-        {
-            //std::cout<<"Threading"<<std::endl;
-            if(*pok == true){
-                std::cout<<"Found Center! :"<< *pnormX <<","<< *pnormY<<std::endl;
-                Camera.moveCameraPix(*pnormX, *pnormY);
-            }
-            sleep(10);
-        }
-    });
-*/
 
 
     // Using time point and system_clock
@@ -158,7 +125,7 @@ int main(int argc, char** argv )
         if(frame.empty())
             break;
 
-	if(count == 20)
+	if(count == 10)
 	{
         Point2f center;
 		*pok = qrzbar.FindQRCenter(frame,center);

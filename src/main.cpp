@@ -8,19 +8,26 @@
 #include <future>
 
 #include "qrzbar.hpp"
+#include "Airspace/Utils/Config.hpp"
 #include "Airspace/Camera/cBoschCameraCtrlDriver.hpp"
 
 using namespace cv;
 using namespace std;
 
 
-void threadFunction(std::shared_ptr<bool> pok, std::shared_ptr<float> pnormX, std::shared_ptr<float> pnormY, std::future<void> futureObj)
+void threadFunction(std::shared_ptr<Airspace::Config> originalConfig, std::shared_ptr<bool> pok, std::shared_ptr<float> pnormX, std::shared_ptr<float> pnormY, std::future<void> futureObj)
 {
     Airspace::BoschConfiguration config; 
-    config.camera_control_addr = "10.1.2.101";
-    config.camera_control_pass = "Gr0und!Sp4c3";
-    config.panOffset = 120; 
-    config.tiltOffset = 197; 
+
+    originalConfig->cfg_get_value("Camera.camera_control_addr", config.camera_control_addr);
+    originalConfig->cfg_get_value("Camera.camera_control_pass", config.camera_control_pass);
+    originalConfig->cfg_get_value("Camera.panOffset", config.panOffset);
+    originalConfig->cfg_get_value("Camera.tiltOffset", config.tiltOffset);
+
+    //config.camera_control_addr = "10.1.203.20";
+    //config.camera_control_pass = "Groundspace123#";
+    //config.panOffset = 120; 
+    //config.tiltOffset = 197; 
 
     Airspace::BoschLookupEntry e;
     e.level=1;
@@ -36,17 +43,21 @@ void threadFunction(std::shared_ptr<bool> pok, std::shared_ptr<float> pnormX, st
             std::cout<<"Found Center! :"<< *pnormX <<","<< *pnormY<<std::endl;
             Camera.moveCameraPix(*pnormX, *pnormY);
             sleep(3);
-            std::cout<<"Get Pan :"<< Camera.getPan() <<std::endl;
+            std::cout<<"Get Pan :"<< std::fixed << std::setprecision(6)<<Camera.getPan() <<std::endl;
             sleep(1);
-            std::cout<<"Get Tilt :"<< Camera.getTilt() <<std::endl;
+            std::cout<<"Get Tilt :"<< std::fixed<< std::setprecision(6)<<Camera.getTilt() <<std::endl;
         }
         sleep(5);
     }
     std::cout<<"Left thread"<<std::endl;
 }
 
-int main(int argc, char** argv )
+int main(int argc, const char** argv )
 {
+
+    std::shared_ptr<Airspace::Config> originalConfig  = std::make_shared<Airspace::Config>();
+    originalConfig->init("camera.cfg", argv, argc);
+
 
     if (argc == 1){
         cout<< "Usage:\n";
@@ -58,9 +69,13 @@ int main(int argc, char** argv )
     }
 
 
+    string stream;
+    originalConfig->cfg_get_value("Camera.stream", stream);
+    //std::cout << stream << std::endl;
+
     // VideoCapture cap(argv[1]); // open the camera
 
-    const string input = (argc > 1) ? argv[1] : "1"; // default to 1
+    const string input = (argc > 1) ? argv[1] : stream; // default to 1
     char* p;
     int converted = strtol(input.c_str(), &p, 10);
     VideoCapture cap;
@@ -93,6 +108,7 @@ int main(int argc, char** argv )
     namedWindow("result",1);
     Mat frame;
 
+
     bool ok = false;
     std::shared_ptr<bool> pok = std::make_shared<bool>(ok);
 
@@ -110,7 +126,8 @@ int main(int argc, char** argv )
 
 
 
-    std::thread th(&threadFunction, pok, pnormX, pnormY, std::move(futureObj));
+
+    std::thread th(&threadFunction, originalConfig, pok, pnormX, pnormY, std::move(futureObj));
 
 
     // Using time point and system_clock

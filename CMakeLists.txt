@@ -1,12 +1,14 @@
 cmake_minimum_required(VERSION 3.2 FATAL_ERROR)
 
-
 find_package( OpenCV REQUIRED )
 find_package( Threads )
 
-add_executable(qrtest  ${PROJECT_SOURCE_DIR}/src/main.cpp ${PROJECT_SOURCE_DIR}/src/qrzbar.cpp)
+set(EXEC_NAME "qrtest")
 
-target_include_directories(qrtest PRIVATE ${PROJECT_SOURCE_DIR}/include )
+file(GLOB SRC ${PROJECT_SOURCE_DIR}/src/*.cpp)
 
+add_executable(${EXEC_NAME}  ${SRC})    
 
-target_link_libraries(qrtest ${OpenCV_LIBS} zbar AirspaceCommon Threads::Threads)
+target_include_directories(${EXEC_NAME} PRIVATE ${PROJECT_SOURCE_DIR}/include )
+
+target_link_libraries(${EXEC_NAME} ${OpenCV_LIBS} zbar AirspaceCommon Threads::Threads)

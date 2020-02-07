@@ -7,15 +7,7 @@
 #include <memory>
 #include <future>
 
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <netinet/in.h>
-#include <netdb.h>
-#include <unistd.h>
-#include <errno.h>
-#include <arpa/inet.h> 
-#include <sstream>
-
+#include "socketcomm.hpp"
 #include "qrzbar.hpp"
 #include "Airspace/Utils/Config.hpp"
 #include "Airspace/Camera/cBoschCameraCtrlDriver.hpp"
@@ -87,7 +79,7 @@ void findOffsets(gps_t homePos, gps_t targetPos)
 
 
 
-void threadFunction(std::shared_ptr<Airspace::Config> originalConfig, std::shared_ptr<bool> pok, std::shared_ptr<float> pnormX, std::shared_ptr<float> pnormY, std::future<void> futureObj)
+void calcLoop(std::shared_ptr<Airspace::Config> originalConfig, std::shared_ptr<bool> pok, std::shared_ptr<float> pnormX, std::shared_ptr<float> pnormY, bool& keepGoing, std::string& gps_data)
 {
     /////////////////////////////////////////////////////////////////// Initialize
 
@@ -132,87 +124,12 @@ void threadFunction(std::shared_ptr<Airspace::Config> originalConfig, std::share
 
 
 
-    /////////////// GPS
-    int sockfd = 0, n = 0;
-    char buffer[256];
-    struct sockaddr_in serv_addr; 
-    int port_num;
-    std::string ip_address;
-
-    originalConfig->cfg_get_value("GPS.ipAddress", ip_address);
-    originalConfig->cfg_get_value("GPS.port", port_num);
-
-    
-
-    memset(buffer, '0',sizeof(buffer));
-    if((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
-    {
-        std::cout<<"\n Error : Could not create socket \n";
-    } 
-
-    memset(&serv_addr, '0', sizeof(serv_addr)); 
-
-    serv_addr.sin_family = AF_INET;
-    serv_addr.sin_port = htons(port_num); 
-
-    bool gps_status = false;
-
-    if(inet_pton(AF_INET, ip_address.c_str(), &serv_addr.sin_addr)<=0)
-    {
-        printf("\n inet_pton error occured\n");
-        gps_status = false;
-        
-    }else{
-        gps_status = true;
-    }
-    if( connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
-    {
-       printf("\n Error : Connect Failed \n");
-       gps_status = false;
-       
-    }else{
-        gps_status = true;
-    }
-
-
     /////////////////////////////////////////////////////////////////// Thread Loop
 
-    while (futureObj.wait_for(std::chrono::milliseconds(1)) == std::future_status::timeout)
+    while (keepGoing)
     {
-        if(!gps_status)
-        {
-            close(sockfd);
-            if((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
-            {
-                std::cout<<"\n Error : Could not create socket \n";
-            } 
-
-            memset(&serv_addr, '0', sizeof(serv_addr)); 
-            serv_addr.sin_family = AF_INET;
-            serv_addr.sin_port = htons(port_num);
-
-            if(inet_pton(AF_INET, ip_address.c_str(), &serv_addr.sin_addr)>0)
-            {
-                gps_status = true;
-            }else{
-                std::cout<<"\n inet_pton error occured\n";
-                gps_status = false;
-            }
-
-            if( connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) >= 0)
-            {
-                gps_status = true;
-            }else{
-                std::cout<<"\n Error : Connect Failed \n";
-                gps_status = false;
-            }
-            
-        }else{
-            recv(sockfd, buffer, 256, 0); 
-            std::cout<<"Reach Says : "<< buffer <<"\n";
-        }
-
-        //std::cout<<"Threading"<<std::endl;
+        
+        std::cout<<"GPS Data: "<< gps_data <<std::endl;
         if(*pok == true){
             std::cout<<"Found Center! :"<< *pnormX <<","<< *pnormY<<std::endl;
             //Camera.moveCameraPix(*pnormX, *pnormY);
@@ -223,7 +140,39 @@ void threadFunction(std::shared_ptr<Airspace::Config> originalConfig, std::share
         }
         sleep(5);
     }
-    std::cout<<"Left thread"<<std::endl;
+    std::cout<<"Left calcLoop"<<std::endl;
+}
+
+void fetchGPSLoop(std::shared_ptr<Airspace::Config> originalConfig, bool& keepGoing, std::string& gps_data)
+{
+    /////////////////////////////////////////////////////////////////// Initialize
+    /////////////// GPS
+    cSocketComm oSocket; 
+    int port_num;
+    std::string ip_address;
+
+    originalConfig->cfg_get_value("GPS.ipAddress", ip_address);
+    originalConfig->cfg_get_value("GPS.port", port_num);
+
+    bool gps_socket_status = false;
+    gps_socket_status = oSocket.initConnection();
+
+
+
+    /////////////////////////////////////////////////////////////////// Thread Loop
+
+    while (keepGoing)
+    {
+        if(!gps_socket_status)
+        {
+            std::cout<<"No connection with socket!" <<"\n";
+            
+        }else{
+            gps_data = oSocket.readSocket();
+        }
+        usleep(500);
+    }
+    std::cout<<"Left fetchGPSLoop"<<std::endl;
 }
 
 int main(int argc, const char** argv )
@@ -291,17 +240,12 @@ int main(int argc, const char** argv )
     float normY = -1.0;
     std::shared_ptr<float> pnormY = std::make_shared<float>(normY);
 
+    bool keepGoing = true;
 
-    // Create a std::promise object
-	std::promise<void> exitSignal;
- 
-	//Fetch std::future object associated with promise
-	std::future<void> futureObj = exitSignal.get_future();
+    std::string gps_data = "No gps data!";
 
-
-
-
-    std::thread th(&threadFunction, originalConfig, pok, pnormX, pnormY, std::move(futureObj));
+    std::thread thread1(&calcLoop, originalConfig, pok, pnormX, pnormY, std::ref(keepGoing), std::ref(gps_data));
+    std::thread thread2(&fetchGPSLoop, originalConfig, std::ref(keepGoing), std::ref(gps_data));
 
 
     // Using time point and system_clock
@@ -347,9 +291,10 @@ int main(int argc, const char** argv )
         if(waitKey(1) >= 0) break;
     }
     //Set the value in promise
-    exitSignal.set_value();
+    keepGoing = false;
     //Wait for thread to join
-    th.join();
+    thread1.join();
+    thread2.join();
     std::cout << "Exiting Main Function" << std::endl;
 
     return 0;

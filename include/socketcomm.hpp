@@ -14,6 +14,7 @@
 #include <sstream>
 #include <iostream>
 #include <vector>
+#include <fcntl.h>
 
 const unsigned int MAX_BUF_LENGTH = 141;
 
@@ -22,14 +23,25 @@ class cSocketComm
     private:
         int sockfd, n;
         struct sockaddr_in serv_addr;
+        std::string ip_address;
+        int port;
 
     public:
-        cSocketComm();
-        ~cSocketComm();
+        cSocketComm(std::string ip_address_, int port_)
+            : ip_address(ip_address_), port(port_)
+        {
+            sockfd = 0, n = 0;
+        }
+
+        ~cSocketComm()
+        {
+            close(sockfd);
+        }
 
         bool initConnection();
+        bool resetConnection();
 
-        std::string readSocket();
+        void readSocket(std::string &rcv_, bool& readStatus);
     
 };
 

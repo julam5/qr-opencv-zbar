@@ -6,6 +6,8 @@
 #include <mutex>
 #include <memory>
 #include <future>
+#include <vector>
+#include <regex>
 
 #include "socketcomm.hpp"
 #include "qrzbar.hpp"
@@ -77,9 +79,38 @@ void findOffsets(gps_t homePos, gps_t targetPos)
 
 }
 
+// for string delimiter
+vector<string> parseStringdata (std::string s, std::string delimiter) {
+    size_t pos_start = 0, pos_end, delim_len = delimiter.length();
+    std::string token;
+    std::vector<std::string> res;
+
+    while ((pos_end = s.find (delimiter, pos_start)) != string::npos) {
+        token = s.substr (pos_start, pos_end - pos_start);
+        pos_start = pos_end + delim_len;
+        if(token.size() != 0){
+            res.push_back (token);
+        }
+    }
+
+    // last item check push back
+    token = s.substr (pos_start);
+    if(token.size() != 0){
+        res.push_back (token);
+    }
+    return res;
+}
+
+void assignValuesFromLLH(std::vector<string> gps_data, double& latitude, double& longitude, double& altitude)
+{
+    latitude = std::stod(gps_data[2]);
+    longitude = std::stod(gps_data[3]);
+    altitude = std::stod(gps_data[4]);
+}
 
 
-void calcLoop(std::shared_ptr<Airspace::Config> originalConfig, std::shared_ptr<bool> pok, std::shared_ptr<float> pnormX, std::shared_ptr<float> pnormY, bool& keepGoing, std::string& gps_data)
+
+void calcLoop(std::shared_ptr<Airspace::Config> originalConfig, bool& ok, float& normX, float& normY, bool& keepGoing, std::string& gps_data)
 {
     /////////////////////////////////////////////////////////////////// Initialize
 
@@ -88,16 +119,6 @@ void calcLoop(std::shared_ptr<Airspace::Config> originalConfig, std::shared_ptr<
     Airspace::BoschConfiguration config; 
 
     config.deserialize(originalConfig);
-
-    //originalConfig->cfg_get_value("Camera.camera_control_addr", config.camera_control_addr);
-    //originalConfig->cfg_get_value("Camera.camera_control_pass", config.camera_control_pass);
-    //originalConfig->cfg_get_value("Camera.panOffset", config.panOffset);
-    //originalConfig->cfg_get_value("Camera.tiltOffset", config.tiltOffset);
-
-    //config.camera_control_addr = "10.1.203.20";
-    //config.camera_control_pass = "Groundspace123#";
-    //config.panOffset = 120; 
-    //config.tiltOffset = 197; 
 
     //Airspace::BoschLookupEntry e;
     //e.level=1;
@@ -115,12 +136,14 @@ void calcLoop(std::shared_ptr<Airspace::Config> originalConfig, std::shared_ptr<
     originalConfig->cfg_get_value("Target.lat", target_position.latitude);
     originalConfig->cfg_get_value("Target.lon", target_position.longitude);
     originalConfig->cfg_get_value("Target.baseHeight", target_position.height);
-    originalConfig->cfg_get_value("Target.alt", target_position .altitude);
+    originalConfig->cfg_get_value("Target.alt", target_position.altitude);
 
 
     findOffsets(home_position, target_position);
 
     //Airspace::cBoschCameraCtrlDriver Camera(config);
+
+    std::vector<std::string> gps_parsed;
 
 
 
@@ -128,11 +151,27 @@ void calcLoop(std::shared_ptr<Airspace::Config> originalConfig, std::shared_ptr<
 
     while (keepGoing)
     {
-        
+        gps_parsed.clear();
         std::cout<<"GPS Data: "<< gps_data <<std::endl;
-        if(*pok == true){
-            std::cout<<"Found Center! :"<< *pnormX <<","<< *pnormY<<std::endl;
-            //Camera.moveCameraPix(*pnormX, *pnormY);
+        gps_parsed = parseStringdata(gps_data, " ");
+
+        if(gps_parsed.size() != 0){
+            assignValuesFromLLH(gps_parsed, target_position.latitude, target_position.longitude, target_position.altitude);
+            std::cout<<"Target.lat: "       << std::fixed << std::setprecision(6)<<target_position.latitude <<std::endl;
+            std::cout<<"Target.lon: "       << std::fixed << std::setprecision(6)<<target_position.longitude <<std::endl;
+            std::cout<<"Target.baseHeight: "<< std::fixed << std::setprecision(6)<<target_position.height <<std::endl;
+            std::cout<<"Target.altitude: "  << std::fixed << std::setprecision(6)<<target_position.altitude <<std::endl;
+            findOffsets(home_position, target_position);
+        }else{
+            std::cout<<"No GPS data available"<<std::endl;
+        }
+
+        //findOffsets(home_position, target_position);
+
+
+        if(ok == true){
+            std::cout<<"Found Center! :"<< normX <<","<< normY<<std::endl;
+            //Camera.moveCameraPix(normX, normY);
             sleep(3);
             //std::cout<<"Get Pan :"<< std::fixed << std::setprecision(6)<<Camera.getPan() <<std::endl;
             sleep(1);
@@ -147,12 +186,13 @@ void fetchGPSLoop(std::shared_ptr<Airspace::Config> originalConfig, bool& keepGo
 {
     /////////////////////////////////////////////////////////////////// Initialize
     /////////////// GPS
-    cSocketComm oSocket; 
     int port_num;
     std::string ip_address;
 
     originalConfig->cfg_get_value("GPS.ipAddress", ip_address);
     originalConfig->cfg_get_value("GPS.port", port_num);
+
+    cSocketComm oSocket(ip_address, port_num); 
 
     bool gps_socket_status = false;
     gps_socket_status = oSocket.initConnection();
@@ -165,10 +205,11 @@ void fetchGPSLoop(std::shared_ptr<Airspace::Config> originalConfig, bool& keepGo
     {
         if(!gps_socket_status)
         {
-            std::cout<<"No connection with socket!" <<"\n";
+            std::cout<<"No connection with socket!" <<std::endl;
+            oSocket.resetConnection();
             
         }else{
-            gps_data = oSocket.readSocket();
+            oSocket.readSocket(gps_data,gps_socket_status);
         }
         usleep(500);
     }
@@ -194,9 +235,6 @@ int main(int argc, const char** argv )
 
     string stream;
     originalConfig->cfg_get_value("Camera.stream", stream);
-    //std::cout << stream << std::endl;
-
-    // VideoCapture cap(argv[1]); // open the camera
 
     const string input = (argc > 1) ? argv[1] : stream; // default to 1
     char* p;
@@ -208,20 +246,12 @@ int main(int argc, const char** argv )
         cap.open(converted);
     }
 
-
-
-
-
     if(!cap.isOpened()){
         // check if we succeeded
         cout << "Capture open failed !\n" << endl;
         return -1;
     }
 
-    //cap.set(cv::CAP_PROP_FPS, 60);
-    //cap.set(cv::CAP_PROP_FOURCC, CV_FOURCC('Y', 'U', 'Y', 'V'));
-    //cap.set(cv::CAP_PROP_FRAME_HEIGHT, 1080);
-    //cap.set(cv::CAP_PROP_FRAME_WIDTH, 1920);
 
     QRZbar qrzbar;
     qrzbar.init();
@@ -233,18 +263,14 @@ int main(int argc, const char** argv )
 
 
     bool ok = false;
-    std::shared_ptr<bool> pok = std::make_shared<bool>(ok);
-
     float normX = -1.0;
-    std::shared_ptr<float> pnormX = std::make_shared<float>(normX);
     float normY = -1.0;
-    std::shared_ptr<float> pnormY = std::make_shared<float>(normY);
 
     bool keepGoing = true;
 
-    std::string gps_data = "No gps data!";
+    std::string gps_data = "";
 
-    std::thread thread1(&calcLoop, originalConfig, pok, pnormX, pnormY, std::ref(keepGoing), std::ref(gps_data));
+    std::thread thread1(&calcLoop, originalConfig, std::ref(ok), std::ref(normX), std::ref(normY), std::ref(keepGoing), std::ref(gps_data));
     std::thread thread2(&fetchGPSLoop, originalConfig, std::ref(keepGoing), std::ref(gps_data));
 
 
@@ -263,22 +289,12 @@ int main(int argc, const char** argv )
 	if(count == 10)
 	{
         Point2f center;
-		*pok = qrzbar.FindQRCenter(frame,center);
-        //cout<<"End of result drawn"<<endl;   
-        if (*pok) 
+		ok = qrzbar.FindQRCenter(frame,center);
+  
+        if (ok) 
         {
-            //std::cout<<"Center: "<<center<<std::endl; 
-            //std::cout<<"Frame cols: "<<frame.cols<<std::endl; 
-            //std::cout<<"Frame rows: "<<frame.rows<<std::endl; 
-            //std::cout<<"center.x/frame.cols: "<<center.x/frame.cols << "  center.y/frame.rows: " << center.y/frame.rows<<std::endl; 
-            
-            //Camera.moveCameraPix(center.x/frame.cols, center.y/frame.rows);
-            //sleep(10);
-            //std::cout<<"Found Center Main! :"<< *pnormX <<","<< *pnormY<<std::endl;
-            *pnormX = center.x/frame.cols;
-            *pnormY = center.y/frame.rows;
-        }else{
-            //std::cout<<"Not Found"<<std::endl;
+            normX = center.x/frame.cols;
+            normY = center.y/frame.rows;
         }
 		count = 0;
 	}else{

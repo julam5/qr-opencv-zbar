@@ -120,10 +120,10 @@ void calcLoop(std::shared_ptr<Airspace::Config> originalConfig, bool& ok, float&
 
     config.deserialize(originalConfig);
 
-    //Airspace::BoschLookupEntry e;
-    //e.level=1;
-    //e.range = 100;
-    //config.zoomLookup.insert(std::pair<int,Airspace::BoschLookupEntry>(1,e));
+    Airspace::BoschLookupEntry e;
+    e.level=1;
+    e.range = 100;
+    config.zoomLookup.insert(std::pair<int,Airspace::BoschLookupEntry>(1,e));
 
 
     gps_t home_position;
@@ -141,7 +141,7 @@ void calcLoop(std::shared_ptr<Airspace::Config> originalConfig, bool& ok, float&
 
     findOffsets(home_position, target_position);
 
-    //Airspace::cBoschCameraCtrlDriver Camera(config);
+    Airspace::cBoschCameraCtrlDriver Camera(config);
 
     std::vector<std::string> gps_parsed;
 
@@ -152,32 +152,39 @@ void calcLoop(std::shared_ptr<Airspace::Config> originalConfig, bool& ok, float&
     while (keepGoing)
     {
         gps_parsed.clear();
-        std::cout<<"GPS Data: "<< gps_data <<std::endl;
+        //std::cout<<"GPS Data: "<< gps_data <<std::endl;
         gps_parsed = parseStringdata(gps_data, " ");
 
         if(gps_parsed.size() != 0){
+            std::cout<<std::endl<<"GPS Data: "<< gps_data <<std::endl;
             assignValuesFromLLH(gps_parsed, target_position.latitude, target_position.longitude, target_position.altitude);
-            std::cout<<"Target.lat: "       << std::fixed << std::setprecision(6)<<target_position.latitude <<std::endl;
-            std::cout<<"Target.lon: "       << std::fixed << std::setprecision(6)<<target_position.longitude <<std::endl;
-            std::cout<<"Target.baseHeight: "<< std::fixed << std::setprecision(6)<<target_position.height <<std::endl;
-            std::cout<<"Target.altitude: "  << std::fixed << std::setprecision(6)<<target_position.altitude <<std::endl;
-            findOffsets(home_position, target_position);
+            //std::cout<<"Target.lat: "       << std::fixed << std::setprecision(6)<<target_position.latitude <<std::endl;
+            //std::cout<<"Target.lon: "       << std::fixed << std::setprecision(6)<<target_position.longitude <<std::endl;
+            //std::cout<<"Target.baseHeight: "<< std::fixed << std::setprecision(6)<<target_position.height <<std::endl;
+            //std::cout<<"Target.altitude: "  << std::fixed << std::setprecision(6)<<target_position.altitude <<std::endl;
+            //findOffsets(home_position, target_position);
         }else{
             std::cout<<"No GPS data available"<<std::endl;
+            //target_position.latitude
+            //target_position.longitude
+            //target_position.altitude;
         }
 
+        std::cout<<"Get Pan :"<< std::fixed << std::setprecision(6)<<Camera.getPan() <<std::endl;
+        sleep(1);
+        std::cout<<"Get Tilt :"<< std::fixed<< std::setprecision(6)<<Camera.getTilt() <<std::endl;
         //findOffsets(home_position, target_position);
 
-
         if(ok == true){
+            findOffsets(home_position, target_position);
             std::cout<<"Found Center! :"<< normX <<","<< normY<<std::endl;
-            //Camera.moveCameraPix(normX, normY);
+            Camera.moveCameraPix(normX, normY);
             sleep(3);
-            //std::cout<<"Get Pan :"<< std::fixed << std::setprecision(6)<<Camera.getPan() <<std::endl;
+            std::cout<<"Get Pan :"<< std::fixed << std::setprecision(6)<<Camera.getPan() <<std::endl;
             sleep(1);
-            //std::cout<<"Get Tilt :"<< std::fixed<< std::setprecision(6)<<Camera.getTilt() <<std::endl;
+            std::cout<<"Get Tilt :"<< std::fixed<< std::setprecision(6)<<Camera.getTilt() <<std::endl <<std::endl;
         }
-        sleep(5);
+        sleep(2);
     }
     std::cout<<"Left calcLoop"<<std::endl;
 }
@@ -304,13 +311,14 @@ int main(int argc, const char** argv )
         // show image
         cv::imshow( "result", frame );
 
-        if(waitKey(1) >= 0) break;
+        if(waitKey(10) >= 0) break;
     }
     //Set the value in promise
     keepGoing = false;
     //Wait for thread to join
-    thread1.join();
     thread2.join();
+    thread1.join();
+    
     std::cout << "Exiting Main Function" << std::endl;
 
     return 0;

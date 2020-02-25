@@ -81,25 +81,33 @@ int main(int argc, const char** argv )
     std::shared_ptr<Airspace::Config> originalConfig  = std::make_shared<Airspace::Config>();
     originalConfig->init("../camera.cfg", argv, argc);
 
-    std::string stream;
+   
+    //////////////// Camera
+    Airspace::BoschConfiguration config; 
 
-    gps_t home_position;
-    originalConfig->cfg_get_value("Location.lat", home_position.latitude);
-    originalConfig->cfg_get_value("Location.lon", home_position.longitude);
-    originalConfig->cfg_get_value("Location.baseHeight", home_position.height);
-    originalConfig->cfg_get_value("Location.alt", home_position.altitude);
+    config.deserialize(originalConfig);
 
-    gps_t target_position;
-    originalConfig->cfg_get_value("Target.lat", target_position.latitude);
-    originalConfig->cfg_get_value("Target.lon", target_position.longitude);
-    originalConfig->cfg_get_value("Target.baseHeight", target_position.height);
-    originalConfig->cfg_get_value("Target.alt", target_position.altitude);
+    Airspace::BoschLookupEntry e;
+    e.level=1;
+    e.range = 100;
+    config.zoomLookup.insert(std::pair<int,Airspace::BoschLookupEntry>(1,e));
 
+    Airspace::cBoschCameraCtrlDriver Camera(config);
 
-    findOffsets(home_position, target_position);
+    /////////////////////////////////////////////////////////////////// Thread Loop
 
-    
-    std::cout << "Exiting Main Function" << std::endl;
+    while (true)
+    {
+        
+
+        std::cout<<"Get Pan :"<< std::fixed << std::setprecision(6)<<Camera.getPan() <<std::endl;
+        sleep(1);
+        std::cout<<"Get Tilt :"<< std::fixed<< std::setprecision(6)<<Camera.getTilt() <<std::endl<<std::endl;
+        //findOffsets(home_position, target_position);
+        sleep(1);
+
+    }
+    std::cout<<"Left get values loop"<<std::endl;
 
     return 0;
 

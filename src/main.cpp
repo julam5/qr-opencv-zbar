@@ -59,7 +59,7 @@ void localOffsetFromGPSDeg(data3d& deltaNed, gps_t* target, gps_t* origin)
 
     deltaNed.x = deltaLat * R_EARTH;
     deltaNed.y = deltaLon * R_EARTH * abs(cos(deg_to_rad(target->latitude)));
-    deltaNed.z = target->height - origin->height;
+    deltaNed.z = (target->altitude + target->height) - (origin->altitude + origin->height);
 }
 
 
@@ -73,7 +73,7 @@ void findOffsets(gps_t homePos, gps_t targetPos)
     double tilt = atan2(anchorToTarget.z, range) / DEG2RAD;
 
 
-    std::cout << "Pan, Range, and Tilt (Real) P=" << yaw << " R=" << range <<" T=" << tilt << std::endl;
+    std::cout << std::fixed << std::setprecision(6)<< "Pan, Range, and Tilt (Real) P=" << yaw << " R=" << range <<" T=" << tilt << std::endl;
     //double tiltOffset = this->config.tiltOffset; //196; // approx. for level view
     //double panOffset = this->config.panOffset;  //19.2; // add to get true north
 
@@ -170,21 +170,23 @@ void calcLoop(std::shared_ptr<Airspace::Config> originalConfig, bool& ok, float&
             //target_position.altitude;
         }
 
-        std::cout<<"Get Pan :"<< std::fixed << std::setprecision(6)<<Camera.getPan() <<std::endl;
-        sleep(1);
-        std::cout<<"Get Tilt :"<< std::fixed<< std::setprecision(6)<<Camera.getTilt() <<std::endl;
+        //std::cout<<"Get Pan :"<< std::fixed << std::setprecision(6)<<Camera.getPan() <<std::endl;
+        //sleep(1);
+        //std::cout<<"Get Tilt :"<< std::fixed<< std::setprecision(6)<<Camera.getTilt() <<std::endl;
         //findOffsets(home_position, target_position);
+        //sleep(1);
 
         if(ok == true){
             findOffsets(home_position, target_position);
             std::cout<<"Found Center! :"<< normX <<","<< normY<<std::endl;
             Camera.moveCameraPix(normX, normY);
-            sleep(3);
+            sleep(1);
             std::cout<<"Get Pan :"<< std::fixed << std::setprecision(6)<<Camera.getPan() <<std::endl;
             sleep(1);
             std::cout<<"Get Tilt :"<< std::fixed<< std::setprecision(6)<<Camera.getTilt() <<std::endl <<std::endl;
+            sleep(2);
         }
-        sleep(2);
+        sleep(1);
     }
     std::cout<<"Left calcLoop"<<std::endl;
 }
@@ -242,6 +244,8 @@ int main(int argc, const char** argv )
 
     string stream;
     originalConfig->cfg_get_value("Camera.stream", stream);
+    int fps;
+    originalConfig->cfg_get_value("Camera.fps", fps);
 
     const string input = (argc > 1) ? argv[1] : stream; // default to 1
     char* p;
@@ -263,7 +267,7 @@ int main(int argc, const char** argv )
     QRZbar qrzbar;
     qrzbar.init();
 
-    int count = 0;
+    unsigned int count = 0;
 
     namedWindow("result",1);
     Mat frame;
@@ -293,25 +297,26 @@ int main(int argc, const char** argv )
         if(frame.empty())
             break;
 
-	if(count == 10)
-	{
-        Point2f center;
-		ok = qrzbar.FindQRCenter(frame,center);
-  
-        if (ok) 
+        if(count%fps==0)
         {
-            normX = center.x/frame.cols;
-            normY = center.y/frame.rows;
+            Point2f center;
+            ok = qrzbar.FindQRCenter(frame,center);
+    
+            if (ok) 
+            {
+                normX = center.x/frame.cols;
+                normY = center.y/frame.rows;
+            }
+
         }
-		count = 0;
-	}else{
-		count++;
-	}
+	    
+
 
         // show image
         cv::imshow( "result", frame );
 
         if(waitKey(10) >= 0) break;
+        count++;
     }
     //Set the value in promise
     keepGoing = false;

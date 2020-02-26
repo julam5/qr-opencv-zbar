@@ -38,7 +38,9 @@ void cCalculateOffset::findOffsets(gps_t homePos, gps_t targetPos)
     double tilt = atan2(anchorToTarget.z, range) / DEG2RAD;
 
 
-    std::cout << std::fixed << std::setprecision(6)<< "Pan, Range, and Tilt (Real) P=" << yaw << " R=" << range <<" T=" << tilt << std::endl;
+    //std::cout << std::fixed << std::setprecision(6)<< "Pan, Range, and Tilt (Real) P=" << yaw << " R=" << range <<" T=" << tilt << std::endl;
+    std::cout << std::fixed << std::setprecision(6)<< "Pan (True North Bearing)= " << yaw << std::endl;
+    std::cout << std::fixed << std::setprecision(6)<< "Tilt (Horizon Zero)= " << tilt << std::endl;
     //double tiltOffset = this->config.tiltOffset; //196; // approx. for level view
     //double panOffset = this->config.panOffset;  //19.2; // add to get true north
 

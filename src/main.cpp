@@ -11,81 +11,17 @@
 
 #include "socketcomm.hpp"
 #include "qrzbar.hpp"
+#include "calculateoffset.hpp"
 #include "Airspace/Utils/Config.hpp"
 #include "Airspace/Camera/cBoschCameraCtrlDriver.hpp"
 
-#define DEG2RAD 0.01745329252
-
-using namespace cv;
-using namespace std;
-
-struct data3d{
-    double x;
-    double y;
-    double z;
-    
-    // default constructor
-    data3d(int x=0, int y=0, int z=0):x(x),y(y),z(z)
-    {
-    }
-
-    // add operator
-    data3d operator+(const data3d& a){
-        return data3d(x+a.x,y+a.y,z+a.z); 
-    }
-};
-
-
-typedef struct gps_st{
-
-    double latitude;
-    double longitude;
-    double altitude;
-    double height;
-}gps_t;
-
-
-inline double deg_to_rad( double deg )
-{
-    return deg * M_PI / 180.0;
-}
-
-void localOffsetFromGPSDeg(data3d& deltaNed, gps_t* target, gps_t* origin)
-{
-    //Expecting gps in rad
-    double R_EARTH = 6378137.0;
-    double deltaLon = deg_to_rad(target->longitude - origin->longitude);
-    double deltaLat = deg_to_rad(target->latitude  - origin->latitude );
-
-    deltaNed.x = deltaLat * R_EARTH;
-    deltaNed.y = deltaLon * R_EARTH * abs(cos(deg_to_rad(target->latitude)));
-    deltaNed.z = (target->altitude + target->height) - (origin->altitude + origin->height);
-}
-
-
-void findOffsets(gps_t homePos, gps_t targetPos)
-{
-
-    data3d anchorToTarget;
-    localOffsetFromGPSDeg(anchorToTarget, &targetPos, &homePos);
-    double yaw = atan2(anchorToTarget.y, anchorToTarget.x) / DEG2RAD;
-    double range = sqrt(anchorToTarget.x * anchorToTarget.x + anchorToTarget.y * anchorToTarget.y);
-    double tilt = atan2(anchorToTarget.z, range) / DEG2RAD;
-
-
-    std::cout << std::fixed << std::setprecision(6)<< "Pan, Range, and Tilt (Real) P=" << yaw << " R=" << range <<" T=" << tilt << std::endl;
-    //double tiltOffset = this->config.tiltOffset; //196; // approx. for level view
-    //double panOffset = this->config.panOffset;  //19.2; // add to get true north
-
-}
-
 // for string delimiter
-vector<string> parseStringdata (std::string s, std::string delimiter) {
+std::vector<std::string> parseStringdata (std::string s, std::string delimiter) {
     size_t pos_start = 0, pos_end, delim_len = delimiter.length();
     std::string token;
     std::vector<std::string> res;
 
-    while ((pos_end = s.find (delimiter, pos_start)) != string::npos) {
+    while ((pos_end = s.find (delimiter, pos_start)) != std::string::npos) {
         token = s.substr (pos_start, pos_end - pos_start);
         pos_start = pos_end + delim_len;
         if(token.size() != 0){
@@ -101,7 +37,7 @@ vector<string> parseStringdata (std::string s, std::string delimiter) {
     return res;
 }
 
-void assignValuesFromLLH(std::vector<string> gps_data, double& latitude, double& longitude, double& altitude)
+void assignValuesFromLLH(std::vector<std::string> gps_data, double& latitude, double& longitude, double& altitude)
 {
     latitude = std::stod(gps_data[2]);
     longitude = std::stod(gps_data[3]);
@@ -139,7 +75,9 @@ void calcLoop(std::shared_ptr<Airspace::Config> originalConfig, bool& ok, float&
     originalConfig->cfg_get_value("Target.alt", target_position.altitude);
 
 
-    findOffsets(home_position, target_position);
+    cCalculateOffset cco;
+
+    cco.findOffsets(home_position, target_position);
 
     Airspace::cBoschCameraCtrlDriver Camera(config);
 
@@ -152,32 +90,16 @@ void calcLoop(std::shared_ptr<Airspace::Config> originalConfig, bool& ok, float&
     while (keepGoing)
     {
         gps_parsed.clear();
-        //std::cout<<"GPS Data: "<< gps_data <<std::endl;
         gps_parsed = parseStringdata(gps_data, " ");
 
         if(gps_parsed.size() != 0){
             std::cout<<std::endl<<"GPS Data: "<< gps_data <<std::endl;
             assignValuesFromLLH(gps_parsed, target_position.latitude, target_position.longitude, target_position.altitude);
-            //std::cout<<"Target.lat: "       << std::fixed << std::setprecision(6)<<target_position.latitude <<std::endl;
-            //std::cout<<"Target.lon: "       << std::fixed << std::setprecision(6)<<target_position.longitude <<std::endl;
-            //std::cout<<"Target.baseHeight: "<< std::fixed << std::setprecision(6)<<target_position.height <<std::endl;
-            //std::cout<<"Target.altitude: "  << std::fixed << std::setprecision(6)<<target_position.altitude <<std::endl;
-            //findOffsets(home_position, target_position);
         }else{
             std::cout<<"No GPS data available"<<std::endl;
-            //target_position.latitude
-            //target_position.longitude
-            //target_position.altitude;
         }
 
-        //std::cout<<"Get Pan :"<< std::fixed << std::setprecision(6)<<Camera.getPan() <<std::endl;
-        //sleep(1);
-        //std::cout<<"Get Tilt :"<< std::fixed<< std::setprecision(6)<<Camera.getTilt() <<std::endl;
-        //findOffsets(home_position, target_position);
-        //sleep(1);
-
         if(ok == true){
-            findOffsets(home_position, target_position);
             std::cout<<"Found Center! :"<< normX <<","<< normY<<std::endl;
             Camera.moveCameraPix(normX, normY);
             sleep(1);
@@ -233,24 +155,24 @@ int main(int argc, const char** argv )
 
 
     if (argc == 1){
-        cout<< "Usage:\n";
-        cout<< "./camtest <camera_index> | <movie_file>\n";
-        cout<< "e.g.\n";
-        cout<< "./camtest 0\n";
-        cout<< "./camtest /home/ubuntu/Downloads/DJI_0004.mp4\n" << endl;
+        std::cout<< "Usage:\n";
+        std::cout<< "./camtest <camera_index> | <movie_file>\n";
+        std::cout<< "e.g.\n";
+        std::cout<< "./camtest 0\n";
+        std::cout<< "./camtest /home/ubuntu/Downloads/DJI_0004.mp4\n" << std::endl;
 
     }
 
 
-    string stream;
+    std::string stream;
     originalConfig->cfg_get_value("Camera.stream", stream);
     int fps;
     originalConfig->cfg_get_value("Camera.fps", fps);
 
-    const string input = (argc > 1) ? argv[1] : stream; // default to 1
+    const std::string input = (argc > 1) ? argv[1] : stream; // default to 1
     char* p;
     int converted = strtol(input.c_str(), &p, 10);
-    VideoCapture cap;
+    cv::VideoCapture cap;
     if (*p){
         cap.open(input);
     } else {
@@ -259,7 +181,7 @@ int main(int argc, const char** argv )
 
     if(!cap.isOpened()){
         // check if we succeeded
-        cout << "Capture open failed !\n" << endl;
+        std::cout << "Capture open failed !\n" << std::endl;
         return -1;
     }
 
@@ -269,8 +191,8 @@ int main(int argc, const char** argv )
 
     unsigned int count = 0;
 
-    namedWindow("result",1);
-    Mat frame;
+    cv::namedWindow("result",1);
+    cv::Mat frame;
 
 
     bool ok = false;
@@ -299,7 +221,7 @@ int main(int argc, const char** argv )
 
         if(count%fps==0)
         {
-            Point2f center;
+            cv::Point2f center;
             ok = qrzbar.FindQRCenter(frame,center);
     
             if (ok) 
@@ -315,7 +237,7 @@ int main(int argc, const char** argv )
         // show image
         cv::imshow( "result", frame );
 
-        if(waitKey(10) >= 0) break;
+        if(cv::waitKey(10) >= 0) break;
         count++;
     }
     //Set the value in promise

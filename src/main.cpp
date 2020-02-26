@@ -106,9 +106,8 @@ void calcLoop(std::shared_ptr<Airspace::Config> originalConfig, bool& ok, float&
             std::cout<<"Get Pan :"<< std::fixed << std::setprecision(6)<<Camera.getPan() <<std::endl;
             sleep(1);
             std::cout<<"Get Tilt :"<< std::fixed<< std::setprecision(6)<<Camera.getTilt() <<std::endl <<std::endl;
-            sleep(2);
         }
-        sleep(1);
+        sleep(2);
     }
     std::cout<<"Left calcLoop"<<std::endl;
 }
@@ -166,8 +165,8 @@ int main(int argc, const char** argv )
 
     std::string stream;
     originalConfig->cfg_get_value("Camera.stream", stream);
-    int fps;
-    originalConfig->cfg_get_value("Camera.fps", fps);
+    int searchFrame;
+    originalConfig->cfg_get_value("Camera.searchFrame", searchFrame);
 
     const std::string input = (argc > 1) ? argv[1] : stream; // default to 1
     char* p;
@@ -178,7 +177,7 @@ int main(int argc, const char** argv )
     } else {
         cap.open(converted);
     }
-
+     
     if(!cap.isOpened()){
         // check if we succeeded
         std::cout << "Capture open failed !\n" << std::endl;
@@ -219,7 +218,7 @@ int main(int argc, const char** argv )
         if(frame.empty())
             break;
 
-        if(count%fps==0)
+        if(count%searchFrame==0)
         {
             cv::Point2f center;
             ok = qrzbar.FindQRCenter(frame,center);

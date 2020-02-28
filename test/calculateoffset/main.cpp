@@ -28,7 +28,7 @@ int main(int argc, const char** argv )
     //findOffsets(home_position, target_position);
     cCalculateOffset cco;
 
-    cco.findOffsets(home_position, target_position);
+    cco.findOffsets(home_position, target_position, 0.0, 0.0);
     
 
     

@@ -40,7 +40,7 @@ class cCalculateOffset
         cCalculateOffset(/* args */);
         ~cCalculateOffset();
         void localOffsetFromGPSDeg(data3d& deltaNed, gps_t* target, gps_t* origin);
-        void findOffsets(gps_t homePos, gps_t targetPos);
+        void findOffsets(gps_t homePos, gps_t targetPos, float panCam, float tiltCam);
         
 };
 

@@ -77,12 +77,14 @@ void calcLoop(std::shared_ptr<Airspace::Config> originalConfig, bool& ok, float&
 
     cCalculateOffset cco;
 
-    cco.findOffsets(home_position, target_position);
+    //cco.findOffsets(home_position, target_position);
 
     Airspace::cBoschCameraCtrlDriver Camera(config);
 
     std::vector<std::string> gps_parsed;
 
+    float panCam;
+    float tiltCam;
 
 
     /////////////////////////////////////////////////////////////////// Thread Loop
@@ -102,10 +104,14 @@ void calcLoop(std::shared_ptr<Airspace::Config> originalConfig, bool& ok, float&
         if(ok == true){
             std::cout<<"Found Center! :"<< normX <<","<< normY<<std::endl;
             Camera.moveCameraPix(normX, normY);
+            sleep(2);
+            panCam = Camera.getPan();
+            std::cout<<"Get Pan :"<< std::fixed << std::setprecision(6)<<panCam <<std::endl;
             sleep(1);
-            std::cout<<"Get Pan :"<< std::fixed << std::setprecision(6)<<Camera.getPan() <<std::endl;
+            tiltCam = Camera.getTilt();
+            std::cout<<"Get Tilt :"<< std::fixed<< std::setprecision(6)<<tiltCam <<std::endl <<std::endl;
             sleep(1);
-            std::cout<<"Get Tilt :"<< std::fixed<< std::setprecision(6)<<Camera.getTilt() <<std::endl <<std::endl;
+            cco.findOffsets(home_position, target_position, panCam, tiltCam);
         }
         sleep(2);
     }
@@ -177,7 +183,7 @@ int main(int argc, const char** argv )
     } else {
         cap.open(converted);
     }
-     
+
     if(!cap.isOpened()){
         // check if we succeeded
         std::cout << "Capture open failed !\n" << std::endl;

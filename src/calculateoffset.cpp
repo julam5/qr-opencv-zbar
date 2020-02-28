@@ -28,7 +28,7 @@ void cCalculateOffset::localOffsetFromGPSDeg(data3d& deltaNed, gps_t* target, gp
 }
 
 
-void cCalculateOffset::findOffsets(gps_t homePos, gps_t targetPos)
+void cCalculateOffset::findOffsets(gps_t homePos, gps_t targetPos, float panCam, float tiltCam)
 {
 
     data3d anchorToTarget;
@@ -43,6 +43,15 @@ void cCalculateOffset::findOffsets(gps_t homePos, gps_t targetPos)
     std::cout << std::fixed << std::setprecision(6)<< "Tilt (Horizon Zero)= " << tilt << std::endl;
     //double tiltOffset = this->config.tiltOffset; //196; // approx. for level view
     //double panOffset = this->config.panOffset;  //19.2; // add to get true north
+
+    double panOffset = yaw+(double)panCam;
+    if(panOffset > 360.0){ panOffset = panOffset - 360.0; }
+    double tiltOffset = tilt - (double)tiltCam;
+
+    std::cout << std::fixed << std::setprecision(6)<< "###### Pan Offset= " << panOffset << std::endl;
+    std::cout << std::fixed << std::setprecision(6)<< "###### Tilt Offset= " << tiltOffset << std::endl;
+
+
 
 }
 

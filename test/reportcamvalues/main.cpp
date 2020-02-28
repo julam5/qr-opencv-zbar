@@ -28,9 +28,22 @@ int main(int argc, const char** argv )
 
     Airspace::cBoschCameraCtrlDriver Camera(config);
 
-    /////////////////////////////////////////////////////////////////// Thread Loop
 
-    //Camera.moveCameraPTZ(0,0,1);
+    ///////////////////////////////
+
+    bool sendPosition = false;
+    float sendPan, sendTilt, sendZoom = -999.0;
+    originalConfig->cfg_get_value("PTZ.sendPosition", sendPosition);
+    originalConfig->cfg_get_value("PTZ.pan", sendPan);
+    originalConfig->cfg_get_value("PTZ.tilt", sendTilt);
+    originalConfig->cfg_get_value("PTZ.zoom", sendZoom);
+
+    if(sendPosition && sendPan != -999.0 && sendTilt != -999.0 && sendZoom != -999.0)
+    {
+        //Camera.moveCameraPTZ(125.855934,193.0,1);
+        Camera.moveCameraPTZ(sendPan, sendTilt, sendZoom);
+    }
+    /////////////////////////////////////////////////////////////////// Thread Loop
 
     while (true)
     {
